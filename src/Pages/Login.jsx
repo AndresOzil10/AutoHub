@@ -1,117 +1,94 @@
+// src/Screens/login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { enviarData } from '../api/Api';
 import { useUser } from '../context/UserContext';
 
-// ─── Iconos desde react-icons ───
-import { FiUser, FiLock, FiEye, FiEyeOff, FiArrowRight, FiAlertCircle, FiCheckCircle, FiShield, FiUserPlus, FiLifeBuoy } from 'react-icons/fi';
-import { FaCarSide } from 'react-icons/fa';
+const API_URL = import.meta.env.VITE_API_URL;
 
-function Login({
-  logo = null,
-  companyName = 'Kayser Automotive Systems',
-  systemLabel = 'AutoHub',
-  greeting = 'Accede a tu panel',
-  subtitle = 'Gestiona vehículos utilitarios',
+const enviarData = async (apiUrl, data) => {
+    try {
+        const resp = await fetch(apiUrl, {
+        method: 'POST',
+        body: JSON.stringify(data),
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        })
+        if (!resp.ok) {
+        throw new Error(`Error en la respuesta de la API: ${resp.estado}`)
+        }
+        return await resp.json();
+    } catch (error) {
+        console.error("Error en la solicitud:", error)
+        throw error
+    }
+}
 
-  onForgotPassword = () => alert('Recuperar contraseña'),
-  onRegister = () => alert('Solicitar acceso'),
-  onSupport = () => alert('Contactar soporte'),
-}) {
-  const navigate = useNavigate();
-  const { login } = useUser();
-
-  const [form, setForm] = useState({ username: '', password: '', remember: false });
+function Login() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [serverError, setServerError] = useState('');
-  const [serverSuccess, setServerSuccess] = useState('');
-
-  const validate = () => {
-    const newErrors = {};
-    if (!form.username.trim()) newErrors.username = 'Ingresa tu usuario';
-    else if (form.username.trim().length < 3)
-      newErrors.username = 'Mínimo 3 caracteres';
-    if (!form.password) newErrors.password = 'Ingresa tu contraseña';
-    else if (form.password.length < 6)
-      newErrors.password = 'Mínimo 6 caracteres';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
-    if (serverError) setServerError('');
-    if (serverSuccess) setServerSuccess('');
-  };
+  const { login } = useUser();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setServerError('');
-    setServerSuccess('');
-
-    if (!validate()) return;
-
+    setError('');
+    
+    // Validaciones básicas
+    if (!username.trim() || !password.trim()) {
+      setError('Por favor, complete todos los campos');
+      return;
+    }
+    
+    if (username.length < 3) {
+      setError('El usuario debe tener al menos 3 caracteres');
+      return;
+    }
+    
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    
     setLoading(true);
 
-    const loginData = {
-      aksi: 'login',
-      username: form.username.trim(),
-      password: form.password,
-    };
-
+    const loginData = { aksi: "login", username: username, password: password }
+    
     try {
-      const response = await enviarData(loginData);
+      const response = await enviarData(API_URL, loginData)
 
-      const isSuccess =
-        response?.estado === 'success' || response?.status === 'success';
-
-      if (isSuccess) {
-        setServerSuccess('¡Inicio de sesión exitoso! Redirigiendo...');
-
-        login(form.username.trim(), response.nn);
-
-        if (form.remember) {
-          localStorage.setItem('remember', 'true');
-        } else {
-          localStorage.removeItem('remember');
-        }
-
-        setTimeout(() => {
-          navigate('/AutoHub/home', {
-            replace: true,
-            state: {
-              usuario: form.username.trim(),
-              nn: response.nn,
-            },
-          });
-        }, 1200);
+      if (response.estado === "success" || response.status === "success") {
+          login(username, response.nn)
+          navigate("/AutoHub/home", { 
+              replace: true, 
+              state: { 
+                  usuario: username,
+                  nn: response.nn,
+              } 
+          })
       } else {
-        setServerError(
-          response?.message ||
-            response?.mensaje ||
-            'Credenciales incorrectas. Intenta de nuevo.'
-        );
+          setError(response.message || response.mensaje || "Credenciales incorrectas. Intenta de nuevo.")
       }
     } catch (error) {
-      console.error('Error durante el login:', error);
-      setServerError('Error de conexión. Intenta de nuevo más tarde.');
+      console.error("Error during API call:", error);
+      setError("Error de conexión. Intenta de nuevo más tarde.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
+  }
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-linear-to-br from-neutral-50 via-white to-neutral-100 p-4 font-sans sm:p-6">
+    <div className="relative flex h-screen supports-[height:100dvh]:h-dvh items-center justify-center overflow-hidden bg-linear-to-br from-neutral-50 via-white to-neutral-100 p-4 font-sans sm:p-6 [@media(max-height:780px)]:p-3">
 
       {/* ═══════════════════════════════════════════════════════════
-          KEYFRAMES INLINE
+          KEYFRAMES INLINE (sin CSS externo)
       ═══════════════════════════════════════════════════════════ */}
       <style>{`
         @keyframes gridFade {
@@ -133,8 +110,9 @@ function Login({
         }
       `}</style>
 
-      {/* ─── CAPA 1: Cuadrícula fina clara (48px) ─── */}
-      <div aria-hidden="true"
+      {/* ─── CAPA 1: Cuadrícula fina clara (48px) con pulso ─── */}
+      <div
+        aria-hidden="true"
         className="anim-grid-fade pointer-events-none absolute inset-0"
         style={{
           animation: 'gridFade 10s ease-in-out infinite',
@@ -148,7 +126,7 @@ function Login({
         }}
       />
 
-      {/* ─── CAPA 2: Cuadrícula secundaria muy fina (12px) tipo "blueprint" ─── */}
+      {/* ─── CAPA 2: Cuadrícula secundaria 12px tinte rojo tipo blueprint ─── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -174,7 +152,7 @@ function Login({
         }}
       />
 
-      {/* ─── CAPA 4: Halo gris neutro inferior-derecho (balance) ─── */}
+      {/* ─── CAPA 4: Halo neutro inferior-derecho (balance) ─── */}
       <div
         aria-hidden="true"
         className="anim-corner pointer-events-none absolute -bottom-40 -right-40 h-130 w-130 rounded-full blur-[120px]"
@@ -196,7 +174,7 @@ function Login({
         }}
       />
 
-      {/* ─── CAPA 6: Línea de escaneo horizontal roja (blueprint scan) ─── */}
+      {/* ─── CAPA 6: Línea de escaneo horizontal roja ─── */}
       <div
         aria-hidden="true"
         className="anim-scan pointer-events-none absolute left-0 right-0 h-px"
@@ -208,29 +186,25 @@ function Login({
         }}
       />
 
-      {/* ─── CAPA 7: Esquinas de "plano técnico" (marcas L en 4 esquinas) ─── */}
-      {/* Esquina superior-izquierda */}
+      {/* ─── CAPA 7: Marcas de esquina tipo plano técnico (L en 4 esquinas) ─── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute left-6 top-6 h-10 w-10 border-l-2 border-t-2 border-red-500/40"
       />
-      {/* Esquina superior-derecha */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute right-6 top-6 h-10 w-10 border-r-2 border-t-2 border-red-500/40"
       />
-      {/* Esquina inferior-izquierda */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-6 left-6 h-10 w-10 border-b-2 border-l-2 border-red-500/40"
       />
-      {/* Esquina inferior-derecha */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-6 right-6 h-10 w-10 border-b-2 border-r-2 border-red-500/40"
       />
 
-      {/* ─── CAPA 8: Texto corporativo decorativo (esquina inferior-izquierda) ─── */}
+      {/* ─── CAPA 8: Texto corporativo (inferior-izquierda) ─── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-8 left-10 hidden flex-col gap-1 sm:flex"
@@ -243,7 +217,7 @@ function Login({
         </span>
       </div>
 
-      {/* ─── CAPA 9: Texto corporativo decorativo (esquina inferior-derecha) ─── */}
+      {/* ─── CAPA 9: Texto corporativo (inferior-derecha) ─── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-8 right-10 hidden flex-col items-end gap-1 sm:flex"
@@ -256,7 +230,7 @@ function Login({
         </span>
       </div>
 
-      {/* ─── CAPA 10: Línea roja inferior tipo "racing" ─── */}
+      {/* ─── CAPA 10: Línea roja inferior tipo racing ─── */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute bottom-0 left-0 right-0 h-px"
@@ -280,227 +254,166 @@ function Login({
       {/* ═══════════════════════════════════════════════════════════
           VENTANA DEL SISTEMA
       ═══════════════════════════════════════════════════════════ */}
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_25px_70px_-15px_rgba(220,38,38,0.20),0_15px_50px_-15px_rgba(0,0,0,0.15)]">
-        {/* Barra superior macOS */}
-        <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-red-500" />
-            <span className="h-3 w-3 rounded-full bg-amber-400" />
-            <span className="h-3 w-3 rounded-full bg-emerald-500" />
+      <div className="relative z-10 w-full max-w-md max-h-full flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden border border-neutral-200">
+        
+        {/* Barra superior estilo navegador (puntos de colores) */}
+        <div className="shrink-0 bg-neutral-50 px-4 py-3 flex items-center justify-between border-b border-neutral-200">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-red-400"></div>
+            <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+            <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
           </div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-            {systemLabel}
-          </p>
-          <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            <span>En línea</span>
+          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">AutoHub</span>
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+            <span className="text-[9px] font-bold text-neutral-400">En línea</span>
           </div>
         </div>
 
-        {/* Cabecera */}
-        <div className="flex flex-col items-center border-b border-neutral-100 px-8 pb-6 pt-8">
-          <div className="relative mb-4">
-            <div className="absolute inset-0 rounded-2xl bg-red-600/30 blur-xl" />
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-red-500/30 bg-linear-to-br from-red-600 to-red-800 shadow-lg shadow-red-900/25">
-              {logo ? (
-                <img
-                  src={logo}
-                  alt={companyName}
-                  className="h-8 w-8 object-contain"
-                />
-              ) : (
-                <FaCarSide className="h-8 w-8 text-white" />
-              )}
+        {/* Contenido del Login */}
+        <div className="p-8 [@media(max-height:780px)]:p-5 [@media(max-height:600px)]:p-4 flex-1 min-h-0 overflow-y-auto">
+          
+          {/* Logo */}
+          <div className="flex justify-center mb-6 [@media(max-height:780px)]:mb-4 [@media(max-height:600px)]:hidden">
+            <div className="w-16 h-16 [@media(max-height:780px)]:w-12 [@media(max-height:780px)]:h-12 bg-red-700 rounded-2xl flex items-center justify-center shadow-lg shadow-red-700/30">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 [@media(max-height:780px)]:h-6 [@media(max-height:780px)]:w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1.83.75 1.46 2.08 1.46 1.42 0 1.94-.63 1.94-1.46 0-.73-.41-1.15-2.19-1.67-2.14-.6-3.58-1.47-3.58-3.46 0-1.77 1.25-2.91 3.06-3.27V4h2.67v1.93c1.65.32 2.88 1.32 3.06 3.06h-1.96c-.14-.77-.68-1.38-1.88-1.38-1.15 0-1.78.56-1.78 1.36 0 .75.47 1.11 2.19 1.61 2.24.66 3.58 1.52 3.58 3.52 0 1.88-1.34 3.01-3.21 3.36z"/>
+              </svg>
             </div>
           </div>
 
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-red-600">
-            {companyName}
-          </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
-            {systemLabel}
-          </p>
-
-          <div className="mt-6 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
-              {greeting}
+          {/* Títulos */}
+          <div className="text-center mb-8 [@media(max-height:780px)]:mb-5">
+            <h1 className="text-[13px] sm:text-sm font-black tracking-[0.18em] text-red-600 uppercase">
+              KAYSER AUTOMOTIVE SYSTEMS
             </h1>
-            <p className="mt-1.5 text-sm text-neutral-500">{subtitle}</p>
+            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-[0.25em] mt-2">
+              AutoHub
+            </p>
+            <h2 className="text-3xl [@media(max-height:780px)]:text-2xl [@media(max-height:600px)]:text-xl font-black text-neutral-900 mt-6 [@media(max-height:780px)]:mt-3">
+              Accede a tu panel
+            </h2>
           </div>
-        </div>
 
-        {/* Formulario */}
-        <main className="px-8 py-8 sm:px-10">
-          {serverError && (
-            <div
-              role="alert"
-              className="mb-6 flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
-              <FiAlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-red-600" />
-              <span>{serverError}</span>
+          {/* Mensaje de Error */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 [@media(max-height:780px)]:mb-3 flex items-start gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="text-xs font-semibold">{error}</span>
             </div>
           )}
 
-          {serverSuccess && (
-            <div
-              role="status"
-              className="mb-6 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
-            >
-              <FiCheckCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-emerald-600" />
-              <span>{serverSuccess}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-            {/* Usuario */}
+          {/* Formulario */}
+          <form onSubmit={handleSubmit} className="space-y-5 [@media(max-height:780px)]:space-y-3">
+            
+            {/* Campo Usuario */}
             <div>
-              <label
-                htmlFor="username"
-                className="mb-2 block text-xs font-semibold uppercase tracking-wider text-neutral-700"
-              >
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider mb-2">
                 Usuario
               </label>
               <div className="relative">
-                <FiUser className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-neutral-400" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
                 <input
-                  id="username"
-                  name="username"
                   type="text"
-                  autoComplete="username"
                   placeholder="mx-user"
-                  value={form.username}
-                  onChange={handleChange}
-                  disabled={loading}
-                  className={`w-full rounded-xl border bg-white py-3.5 pl-12 pr-4 text-sm text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:ring-4 disabled:bg-neutral-50 disabled:opacity-70 ${
-                    errors.username
-                      ? 'border-red-500 focus:border-red-600 focus:ring-red-500/10'
-                      : 'border-neutral-200 focus:border-red-500 focus:ring-red-500/10 hover:border-neutral-300'
-                  }`}
+                  className="w-full pl-10 pr-4 py-3 [@media(max-height:780px)]:py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium text-neutral-800 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all placeholder:text-neutral-400"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
                 />
               </div>
-              {errors.username && (
-                <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-600">
-                  <FiAlertCircle className="h-3.5 w-3.5" />
-                  {errors.username}
-                </span>
-              )}
             </div>
-
-            {/* Contraseña */}
+            
+            {/* Campo Contraseña */}
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="password"
-                  className="text-xs font-semibold uppercase tracking-wider text-neutral-700"
-                >
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-wider">
                   Contraseña
                 </label>
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  className="text-xs font-medium text-red-600 transition hover:text-red-700 hover:underline"
-                >
-                  ¿La olvidaste?
-                </button>
               </div>
               <div className="relative">
-                <FiLock className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-neutral-400" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
                 <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Tu contraseña"
-                  value={form.password}
-                  onChange={handleChange}
-                  disabled={loading}
-                  className={`w-full rounded-xl border bg-white py-3.5 pl-12 pr-12 text-sm text-neutral-900 outline-none transition-all placeholder:text-neutral-400 focus:ring-4 disabled:bg-neutral-50 disabled:opacity-70 ${
-                    errors.password
-                      ? 'border-red-500 focus:border-red-600 focus:ring-red-500/10'
-                      : 'border-neutral-200 focus:border-red-500 focus:ring-red-500/10 hover:border-neutral-300'
-                  }`}
+                  className="w-full pl-10 pr-12 py-3 [@media(max-height:780px)]:py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium text-neutral-800 outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all placeholder:text-neutral-400"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((s) => !s)}
-                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-neutral-400 transition hover:bg-red-50 hover:text-red-600"
+                  onClick={togglePasswordVisibility}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-600 transition-colors"
                 >
                   {showPassword ? (
-                    <FiEyeOff className="h-4.5 w-4.5" />
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
                   ) : (
-                    <FiEye className="h-4.5 w-4.5" />
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-600">
-                  <FiAlertCircle className="h-3.5 w-3.5" />
-                  {errors.password}
-                </span>
-              )}
             </div>
-
-            {/* Recordarme */}
-            <label className="flex cursor-pointer select-none items-center gap-2.5">
-              <input
-                type="checkbox"
-                name="remember"
-                checked={form.remember}
-                onChange={handleChange}
+            
+            {/* Botón Submit */}
+            <div>
+              <button 
+                type="submit" 
                 disabled={loading}
-                className="h-4 w-4 cursor-pointer rounded border-neutral-300 accent-red-600"
-              />
-              <span className="text-sm text-neutral-600">
-                Mantener mi sesión activa
-              </span>
-            </label>
-
-            {/* Botón principal */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-red-600 to-red-700 text-sm font-semibold text-white shadow-lg shadow-red-600/25 transition-all hover:-translate-y-0.5 hover:from-red-500 hover:to-red-600 hover:shadow-xl hover:shadow-red-600/40 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Verificando...
-                </>
-              ) : (
-                <>
-                  Entrar al panel
-                  <FiArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </button>
-
-            {/* Divider */}
-            <div className="relative flex items-center gap-3">
-              <div className="h-px flex-1 bg-neutral-200" />
-              <span className="text-[10px] uppercase tracking-widest text-neutral-400">
-                o
-              </span>
-              <div className="h-px flex-1 bg-neutral-200" />
+                className="w-full bg-red-700 hover:bg-red-800 active:scale-[0.98] text-white font-black py-4 [@media(max-height:780px)]:py-3 rounded-xl shadow-lg shadow-red-700/20 flex items-center justify-center gap-2 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <>
+                    Entrar al panel
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </>
+                )}
+              </button>
             </div>
-
           </form>
-        </main>
-
-        {/* Barra inferior */}
-        <div className="flex items-center justify-between border-t border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] text-neutral-500">
-          <span>
-            © {new Date().getFullYear()} {companyName}
-          </span>
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline">Privacidad</span>
-            <span className="hidden sm:inline">Términos</span>
-            <span className="flex items-center gap-1.5">
-              <FiShield className="h-3 w-3 text-emerald-500" />
-              Sesión segura
-            </span>
+          
+          {/* Divisor */}
+          <div className="flex items-center gap-3 my-6 [@media(max-height:780px)]:my-3">
+            <div className="flex-1 h-px bg-neutral-200"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-neutral-300"></div>
+            <div className="flex-1 h-px bg-neutral-200"></div>
           </div>
         </div>
+
+        {/* Footer inferior */}
+        <div className="shrink-0 bg-neutral-50 border-t border-neutral-200 px-6 py-3 flex items-center justify-between">
+          <span className="text-[9px] font-medium text-neutral-400">
+            © 2026 Kayser Automotive Systems
+          </span>
+          <div className="flex items-center gap-4">
+            <a href="#" className="text-[9px] font-medium text-neutral-400 hover:text-neutral-600">Privacidad</a>
+            <a href="#" className="text-[9px] font-medium text-neutral-400 hover:text-neutral-600">Términos</a>
+            <div className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+              <span className="text-[9px] font-bold text-emerald-600">Sesion segura</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
